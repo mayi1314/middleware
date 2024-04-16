@@ -1,0 +1,34 @@
+leader_pid: 2
+mutex_handler: BaseMutexHandler
+udp_bcast_ip: 127.255.255.255
+udp_port: 61820
+agents:
+    - pid: 0
+      on_device: agv1
+      motion_automaton: agv
+    - pid: 1
+      on_device: ceiling_robot
+      motion_automaton: ceiling_robot
+    - pid: 2
+      on_device: floor_robot
+      motion_automaton: floor_robot
+    - pid: 3
+      on_device: conveyor
+      motion_automaton: conveyor
+
+devices:
+    agv1:
+      bot_type: agv
+      ip: 127.0.1.0
+
+    ceiling_robot:
+      bot_type: ceiling_robot
+      ip: 127.0.1.1
+
+    floor_robot:
+      bot_type: floor_robot
+      ip: 127.0.1.2
+
+    conveyor:
+      bot_type: conveyor
+      ip: 127.0.1.3
