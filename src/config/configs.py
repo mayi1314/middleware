@@ -74,12 +74,12 @@ class MoveitMoatConfig:
 
 
 class MoatConfig(object):
-    from src.motion.planner import Planner
-    from src.motion.simpleplanner import SimplePlanner
+    #from src.motion.planner import Planner
+    #from src.motion.simpleplanner import SimplePlanner
 
     def __init__(self, waypoint_topic: str, reached_topic: str, rospy_node: str, bot_name: str, queue_size: int,
                  bot_type: BotType, pos_node: str, pos_msg_type=None, rchd_msg_type=None,
-                 planner: Planner = SimplePlanner()):
+                 planner=None):
         """
 
         :param waypoint_topic:
@@ -136,38 +136,38 @@ def gen_waypoint_params(config: MoatConfig):
 # TODO generate default simulation moat car config
 # TODO generate detault simulation moat drone config
 
-def default_car_moat_config(bot_name) -> MoatConfig:
-    rospy_node = 'waypoint_node'
-    bot_type = BotType.CAR
-    waypoint_topic = 'waypoint'
-    reached_topic = 'reached'
+# def default_car_moat_config(bot_name) -> MoatConfig:
+#     rospy_node = 'waypoint_node'
+#     bot_type = BotType.CAR
+#     waypoint_topic = 'waypoint'
+#     reached_topic = 'reached'
+#
+#     from geometry_msgs.msg import PoseStamped
+#     from std_msgs.msg import String
+#
+#     queue_size = 10
+#     bot_name = bot_name
+#     pos_node = 'vrpn_client_node/'
+#     pos_msg_type = PoseStamped
+#     rchd_msg_type = String
+#     from src.motion.simpleplanner import SimplePlanner
+#     return MoatConfig(waypoint_topic, reached_topic, rospy_node, bot_name, queue_size, bot_type, pos_node, pos_msg_type,
+#                       rchd_msg_type, SimplePlanner())
 
-    from geometry_msgs.msg import PoseStamped
-    from std_msgs.msg import String
 
-    queue_size = 10
-    bot_name = bot_name
-    pos_node = 'vrpn_client_node/'
-    pos_msg_type = PoseStamped
-    rchd_msg_type = String
-    from src.motion.simpleplanner import SimplePlanner
-    return MoatConfig(waypoint_topic, reached_topic, rospy_node, bot_name, queue_size, bot_type, pos_node, pos_msg_type,
-                      rchd_msg_type, SimplePlanner())
-
-
-def default_qc_moat_config(bot_name) -> MoatConfig:
-    rospy_node = 'drone'
-    bot_type = BotType.QUAD
-    waypoint_topic = 'waypoint'
-    reached_topic = 'reached'
-    from geometry_msgs.msg import PoseStamped
-    from std_msgs.msg import String
-    queue_size = 10
-    bot_name = bot_name
-    pos_node = 'vrpn_client_node/'
-    pos_msg_type = PoseStamped
-    rchd_msg_type = String
-    from src.motion.simpleplanner import SimplePlanner
-
-    return MoatConfig(waypoint_topic, reached_topic, rospy_node, bot_name, queue_size, bot_type, pos_node, pos_msg_type,
-                      rchd_msg_type, SimplePlanner())
+# def default_qc_moat_config(bot_name) -> MoatConfig:
+#     rospy_node = 'drone'
+#     bot_type = BotType.QUAD
+#     waypoint_topic = 'waypoint'
+#     reached_topic = 'reached'
+#     from geometry_msgs.msg import PoseStamped
+#     from std_msgs.msg import String
+#     queue_size = 10
+#     bot_name = bot_name
+#     pos_node = 'vrpn_client_node/'
+#     pos_msg_type = PoseStamped
+#     rchd_msg_type = String
+#     from src.motion.simpleplanner import SimplePlanner
+#
+#     return MoatConfig(waypoint_topic, reached_topic, rospy_node, bot_name, queue_size, bot_type, pos_node, pos_msg_type,
+#                       rchd_msg_type, SimplePlanner())
