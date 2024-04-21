@@ -1,0 +1,41 @@
+allread:
+  pos[] mypos
+
+allwrite:
+
+  boolean all_loaded
+  pos[] part_locs_on_tray
+  int nums_part_on_tray
+  pos[] assembly_pos
+  pos current_part_pose
+  pos target_pose
+  pos part
+  boolean agv_reached
+  pos part_to_pick_loc
+
+
+
+using ConveyorBelt:
+  actuators:
+    float control_power
+  sensors:
+    boolean enabled
+    float power
+
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos part_loc
+
+start:
+    pre: !ConveyorBelt.enabled and !Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 10.0
+
+detected:
+    pre: ConveyorBelt.enabled && Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 0.0
+        current_part_pose = Proximity.part_loc
+
+

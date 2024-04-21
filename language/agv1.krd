@@ -1,0 +1,51 @@
+allread:
+  pos[] mypos
+
+allwrite:
+
+  boolean all_loaded
+  pos[] part_locs_on_tray
+  int nums_part_on_tray
+  pos[] assembly_pos
+  pos current_part_pose
+  pos target_pose
+  pos part
+  boolean agv_reached
+  pos part_to_pick_loc
+
+
+
+using AGV:
+  actuators:
+    int to_station
+  sensors:
+    pos station
+    boolean reached
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos[] part_loc
+
+local:
+    string state = "IDLE"
+    string name = "agv1"
+    int quadrant = 4
+    int to_station_loc = 1
+
+init:
+    part_locs_on_tray = moat.utils.compute_tray_loc(name, quadrant)
+
+goto_station:
+    pre: all_loaded && state == "IDLE"
+    eff:
+        AGV.to_station = to_station_loc
+        state = "MOVING"
+        agv_reached = false
+
+reset:
+    pre: state == "MOVING" && AGV.reached
+    eff:
+        part_locs_on_tray = Proximity.part_loc
+        agv_reached = true
+        state = "END"
+

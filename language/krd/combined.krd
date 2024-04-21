@@ -1,0 +1,201 @@
+allread:
+  pos[] mypos: [floor_robot, agv1]
+
+allwrite:
+  boolean exit: [floor_robot, agv1, agv2, ceiling_robot]
+  string process
+  boolean all_loaded
+  pos kit_starting_pose
+  pos kit_ending_pose
+  part part
+  boolean agv_reached
+
+
+
+@agent(conveyor)
+using ConveyorBelt:
+  actuators:
+    float control_power
+  sensors:
+    boolean enabled
+    float power
+
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos part_loc
+
+start:
+    pre: !ConveyorBelt.enabled and !Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 10.0
+
+detected:
+    pre: ConveyorBelt.enabled && Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 0.0
+        current_part_pose = Proximity.part_loc
+
+
+@agent(floor_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_count = 0
+
+detected:
+    pre: state == "IDLE" && current_part_pose != None
+    eff:
+        Arm.reach_pos = current_part_pose
+        state = "PICK"
+
+pickup:
+    pre: state == "PICK" && Arm.reached
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+
+transfer:
+    pre: state == "PICKED" && Gripper.enabled && Gripper.attached
+    eff:
+        Arm.reach_pos = part_to_pick_loc
+        state = "DROP"
+
+drop:
+    pre: state == "DROP" && Arm.reached
+    eff:
+        Gripper.enable_suction = false
+        state = "DROPPED"
+
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "END"
+        all_loaded = true
+
+
+@agent(agv1)
+using AGV:
+  actuators:
+    int to_station
+  sensors:
+    pos station
+    boolean reached
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos[] part_loc
+
+local:
+    string state = "IDLE"
+    string name = "agv1"
+    int quadrant = 4
+    int to_station_loc = 1
+
+init:
+    part_locs_on_tray = moat.utils.compute_tray_loc(name, quadrant)
+
+goto_station:
+    pre: all_loaded && state == "IDLE"
+    eff:
+        AGV.to_station = to_station_loc
+        state = "MOVING"
+        agv_reached = false
+
+reset:
+    pre: state == "MOVING" && AGV.reached
+    eff:
+        part_locs_on_tray = Proximity.part_loc
+        agv_reached = true
+        state = "END"
+
+@agent(ceiling_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+    pos assemble
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_count = 0
+
+detected:
+    pre: state == "IDLE" && part_locs_on_tray != None && agv_reached
+    eff:
+        current_part_pose = part_locs_on_tray[part_count]
+        Arm.reach_pos = current_part_pose
+        state = "PICK"
+
+attach:
+    pre: state == "PICK" && Arm.reached
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+
+assemble:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.assemble = current_part_pose
+        state = "DROPPED"
+
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "END"
+        part_count = part_count + 1
+
+
+monitor:
+    check_duration('floor_robot', 'transfer', 'Gripper.attached', 'true' )
+    exception:
+        @agent('floor_robot')
+        local: string state = 'IDLE'
+        init:
+            exit = false
+        exit:
+            pre: exit
+            eff: true
+        pick:
+            pre: state == 'START'
+            eff:
+                kit_starting_pose = check_part_on_bin(part)
+                if kit_starting_pose:
+                    Arm.reach_pos = kit_starting_pose
+                    state = 'PICK'
+                else:
+                    exit = true
+        suck:
+            pre: state == 'PICK'
+            eff:
+                Gripper.enable_suction = true
+                state = 'PICKED'
+        end:
+            pre: state == 'PICKED'
+            eff:
+                exit = true
+                state == 'END'
+
+
+
+

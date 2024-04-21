@@ -1,0 +1,29 @@
+import Motion
+
+all_read:
+  pos[] my_pos
+
+local:
+   int i = 0
+
+
+init:
+  m1 = Motion()
+  m2 = Motion()
+  ...
+  m5 = Motion()
+
+  ###  m[1-5] = Motion()
+
+update:
+   pre: i < 100
+   eff:
+      i = i + 1
+      my_pos[pid] = m[i].position
+      if (pid != 0 and pid != numAgents - 1):
+        m[i].run(midpoint(my_pos[pid+1], my_pos[pid-1]))
+
+end:
+   pre: True
+   eff:
+      trystop()

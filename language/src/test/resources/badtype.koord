@@ -1,0 +1,25 @@
+using Motion:
+  actuators:
+    int foo
+  sensors:
+    int bar
+
+allwrite:
+  int a
+  boolean b
+
+allread:
+  int[] c
+  int[] d
+
+local:
+  pos apple
+  boolean banana
+  int cat
+
+dosomething:
+  pre:true
+  eff:
+    apple = banana
+    cat = 1 + banana
+    banana = 1 + 2

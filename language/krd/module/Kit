@@ -1,0 +1,67 @@
+agent Kitting_robot
+  using Arm
+    actuators:
+      pos reach_pos
+    sensors:
+      bool reached
+
+  using Gripper
+    actuators:
+      bool enable_suction
+    sensors:
+      bool enabled
+      bool attached
+
+  local:
+    enum {IDLE, PICK, DROP} state = IDLE
+    Time timer = 0
+
+  input:
+    pos start_pos
+    pos target_pos
+
+  output:
+
+
+  detected:
+    pre: state == IDLE && start_pos != None
+    eff:
+      Arm.reach_pos = start_pos
+      state = PICK
+
+  pickup:
+    pre: state == PICK && Arm.reached
+    eff:
+      Gripper.enable_suction = true
+      timer = 0
+
+  transfer:
+    pre: state == PICK && Gripper.enabled && Gripper.attached
+    eff:
+      Arm.reach_pos = target_pos
+      start_pos = None
+      state = DROP
+
+  drop:
+    pre: state == DROP && Arm.reached
+    eff:
+      Gripper.enable_suction = false
+
+  reset:
+    pre: state == DROP && !Gripper.enabled && !Gripper.attached
+    eff:
+      state = IDLE
+
+  tick:
+    eff: timer++
+
+  pickup_timeout:
+    pre: state == PICK && Gripper.enabled && !Gripper.attached
+         && timer >= TIMEOUT
+    eff:
+      print("pick timeout")
+
+  daemon:
+    pre: state == PICK && !Gripper.attached  #TODO: check, set hz to subscribe the topic of Gripper.attached
+    eff:
+      print('exception warning: picking')

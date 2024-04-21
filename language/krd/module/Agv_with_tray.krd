@@ -1,0 +1,36 @@
+agent AGV_with_tray
+  using AGV:
+    actuators:
+      pos to_station
+    sensors:
+      enum {IDLE, MOVING, FINISH, ALL_DROPPED} state = IDLE
+      pos station
+      bool reached
+  using Tray:
+    sensors:
+      pos part_loc_on_tray
+
+  local:
+    int id = 1
+    home_loc = station
+
+  input:
+    bool all_loaded
+    pos to_station_loc
+
+  output:
+    state
+
+  goto_station:
+    pre: all_loaded && state == IDLE
+    eff: to_station = to_station_loc   // as_loc
+         state = MOVING
+
+  go_home:
+    pre: state == ALL_DROPPED
+    eff: to_station = home_loc   // home_loc
+         state = MOVING
+
+  finish:
+    pre: state == MOVING && AGV.reached
+    eff: state = FINISH

@@ -1,0 +1,82 @@
+import ConveyorBelt_with_Sensor
+import Kitting_robot
+import AGV_with_tray
+import Gantry
+
+all_read:
+  bool self_pos
+
+
+all_write:
+  int nums_part_on_tray
+  pos part_loc_on_belt
+   pos start_pos
+
+const:
+  as_pos = [1, 2, 3, 4]
+  nums_part_on_tray = 4
+  part_locs_on_tray = [1, 2, 3, 4]
+  assembly_pos = [1, 2, 3, 4]
+
+local:
+  pos start_pos
+  pos target_pos
+  int count = 0
+  enum {IDLE, ALL_LOADED, READY， DROPPED, } state = IDLE
+
+init:
+  c1 = ConveyorBelt_with_Sensor()
+  k1 = Kitting_robot()
+  agv1 = AGV_with_tray()
+  agv2 = AGV_with_tray()
+  gantry = Gantry()
+
+  ##  or config to start?
+
+@agent(c1, k1)
+kit_task:
+  pre: state == IDLE && count < nums_part_on_tray
+  eff:
+    start_pos = c1.run()
+    target_pos = part_locs_on_tray[count]
+    count += 1
+    k1.run(start_pos, target_pos)
+    if count == nums_part_on_tray:
+        state = ALL_LOADED
+
+##
+##Split the task into two finer parts
+##
+
+@agent(c1)
+belt_task:
+  pre: state == IDLE && count < nums_part_on_tray
+  eff:
+    start_pos = c1.run()
+
+@agent(k1)
+kit_task:
+  pre: start_pos != None
+  eff:
+    target_pos = part_locs_on_tray[count]
+    count += 1
+    k1.run(start_pos, target_pos)
+    start_pos = None
+    if count == nums_part_on_tray:
+       state = ALL_LOADED
+
+@agent(agv1)
+move_to_as:
+  pre: ALL_LOADED
+  eff:
+    avg1.run(as_pos[0])
+    state = READY
+
+@agent(gantry)
+assembly_task:
+  pre: READY
+  eff:
+    gantry.run(part_locs_on_tray[nums_part_on_tray - count], assembly_pos[nums_part_on_tray - count])
+    count -= 1
+    if count == 0:
+        state = DROPPED

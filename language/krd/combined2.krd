@@ -1,0 +1,186 @@
+allread:
+  Product prod0
+
+allwrite:
+  pos part_loc_on_belt
+  pos to_station_loc
+  boolean all_loaded
+
+const:
+  nums_part_on_tray = 4
+  part_locs_on_tray = [1, 2, 3, 4]
+  assembly_pos = [1, 2, 3, 4]
+  station_pos_map = {1: [as1, as2], 2: [as1, as2], 3: [as3, as4], 4: [as3, as4]}
+
+agent Conveyor
+  using ConveyorBelt:
+    actuators:
+      float control_power
+    sensors:
+      bool enabled
+      float power
+
+## sensors variable whether change
+
+  using Proximity
+    sensors:
+      bool object_detected
+      pos part_loc
+
+  start:
+    pre: !ConveyorBelt.enabled
+    eff:
+      ConveyorBelt.enabled = true
+      ConveyorBelt.control_power = 10.0
+
+  stop:
+    pre: ConveyorBelt.enabled
+      ConveyorBelt.control_power = 0.0
+      ConveyorBelt.enabled = false
+
+  detected:
+    pre: ConveyorBelt.enabled && Proximity.object_detected
+    eff:
+      ConveyorBelt.control_power = 0.0
+      part_loc_on_belt = Proximity.part_loc
+
+
+agent Kitting
+  using Arm
+    actuators:
+      pos reach_pos
+    sensors:
+      bool reached
+
+  using Gripper
+    actuators:
+      bool enable_suction
+    sensors:
+      bool enabled
+      bool attached
+
+  local:
+    enum {IDLE, PICK, DROP} state = IDLE
+    Time timer = 0
+    int part_count = 0
+
+  detected:
+    pre: state == IDLE && part_loc_on_belt != None
+    eff:
+      Arm.reach_pos = part_loc_on_belt
+      state = PICK
+
+  pickup:
+    pre: state == PICK && Arm.reached
+    eff:
+      Gripper.enable_suction = true
+      timer = 0
+
+  transfer:
+    pre: state == PICK && Gripper.enabled && Gripper.attached
+    eff:
+      Arm.reach_pos = part_locs_on_tray[part_count]
+      part_loc_on_belt = None
+      state = DROP
+
+  drop:
+    pre: state == DROP && Arm.reached
+    eff:
+      Gripper.enable_suction = false
+
+  reset:
+    pre: state == DROP && !Gripper.enabled && !Gripper.attached
+    eff:
+      state = IDLE
+      part_count += 1
+      if part_count == nums_part_on_tray:
+        all_loaded = True
+
+  tick:
+    eff: timer++
+
+  pickup_timeout:
+    pre: state == PICK && Gripper.enabled && !Gripper.attached
+         && timer >= TIMEOUT
+    eff:
+
+
+agent AGV1
+  using AGV:
+    actuators:
+      pos to_station
+    sensors:
+      enum {IDLE, MOVING, FINISH, ALL_DROPPED} state = IDLE
+      pos station
+      bool reached
+  using Tray:
+    sensors:
+      pos part_loc_on_tray
+
+  local:
+    id = 1
+
+  goto_station:
+    pre: all_loaded && state == IDLE
+    eff: to_station = to_station_loc   // as_loc
+         state = MOVING
+
+  go_home:
+    pre: state == ALL_DROPPED
+    eff: to_station = to_home_loc   // start_loc
+         state = MOVING
+
+  finish:
+    pre: state == MOVING && AGV.reached
+    eff: state = FINISH
+
+
+agent AGV2 extends AVG1(id = 2)
+
+agent Gantry
+  using Arm
+    actuators:
+      pos reach_pos
+    sensors:
+      bool reached
+
+  using Gripper
+    actuators:
+      bool enable_suction
+    sensors:
+      bool enabled
+      bool attached
+
+  local:
+    enum {IDLE, PICK, DROP} state = IDLE
+    Time timer = 0
+    part_count = 0
+
+  detected:
+    pre: state == IDLE && part_loc_on_tray != None
+    eff:
+      Arm.reach_pos = part_locs_on_tray[part_count]
+      state = PICK
+
+  pickup:
+    pre: state == PICK && Arm.reached
+    eff:
+      Gripper.enable_suction = true
+      timer = 0
+
+  transfer:
+    pre: state == PICK && Gripper.enabled && Gripper.attached
+    eff:
+      Arm.reach_pos = assembly_pos[part_count]
+      state = DROP
+
+  drop:
+    pre: state == DROP && Arm.reached
+    eff:
+      Gripper.enable_suction = false
+
+  reset:
+    pre: state == DROP && !Gripper.enabled && !Gripper.attached
+    eff:
+      state = IDLE
+      Arm.reach_pos = home_pos  // need to go home??

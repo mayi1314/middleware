@@ -1,0 +1,213 @@
+allread:
+  pos[] mypos: [floor_robot, agv1]
+
+allwrite:
+  boolean exit: [floor_robot, agv1, agv2, ceiling_robot]
+  string process
+  boolean all_loaded
+  pos kit_starting_pose
+  pos kit_ending_pose
+  part part
+  boolean agv_reached
+  pos conv_part_pose
+
+
+@agent(conveyor)
+using ConveyorBelt:
+  actuators:
+    float control_power
+  sensors:
+    boolean enabled
+    float power
+
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos part_loc
+
+local:
+    string state = "STARTED"
+
+start:
+    pre: state == "STOPPED" and !Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 100.0
+        state = "STARTED"
+stop:
+    pre: state == "STARTED" and Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 0.0
+        state = "STOPPED"
+detect:
+    pre: state == "STOPPED" && Proximity.object_detected
+    eff:
+        conv_part_pose = Proximity.part_loc
+
+
+@agent(floor_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_nums = 0
+    int count = 0
+
+move:
+    pre: state == "START" && kit_starting_pose != None  // kit_starting_pose type: array
+    eff:
+        Arm.reach_pos = kit_starting_pose[count]
+        state = "PICK"
+
+pick:
+    pre: state == "PICK"
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+
+transfer:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.reach_pos = kit_ending_pose
+        state = "DROP"
+
+drop:
+    pre: state == "DROP" && Gripper.attached
+    eff:
+        Gripper.enable_suction = false
+        state = "DROPPED"
+
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "IDLE"
+        count = count + 1
+        if part_nums == count:  // order finished
+            all_loaded = true
+            count = 0
+            kit_starting_pose = moat.order.get()  // get order info
+
+
+@agent(agv1)
+using AGV:
+  actuators:
+    int to_station
+  sensors:
+    pos station
+    boolean reached
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos[] part_loc
+
+local:
+    string state = "IDLE"
+    int destination = 1
+
+move:
+    pre: all_loaded && state == "START"
+    eff:
+        AGV.to_station = destination
+        state = "STOP"
+
+update:
+    pre: state == "STOP"
+    eff:
+        part_locs_on_tray = Proximity.part_loc
+
+@agent(ceiling_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+    pos assemble
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_count = 0
+
+move:
+    pre: state == "START" && part_locs_on_tray != None
+    eff:
+        ceiling_starting_pose = part_locs_on_tray[part_count]
+        Arm.reach_pos = current_part_pose
+        state = "PICK"
+
+pick:
+    pre: state == "PICK"
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+
+assemble:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.assemble = ceiling_ending_pose
+        state = "DROP"
+
+drop:
+    pre: state == "DROP" && Gripper.attached
+    eff:
+        Gripper.enable_suction = false
+        state = "DROPPED"
+
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "IDLE"
+        part_count += 1
+        if part_count == len(part_locs_on_tray):
+            part_locs_on_tray = None
+            part_count = 0
+
+monitor:
+    check_duration('floor_robot', 'transfer', 'Gripper.attached', 'true' )
+    exception:
+        @agent('floor_robot')
+        local: string state = 'IDLE'
+        init:
+            exit = false
+        exit:
+            pre: exit
+            eff: true
+        pick:
+            pre: state == 'START'
+            eff:
+                kit_starting_pose = check_part_on_bin(part)
+                if kit_starting_pose:
+                    Arm.reach_pos = kit_starting_pose
+                    state = 'PICK'
+                else:
+                    exit = true
+        suck:
+            pre: state == 'PICK'
+            eff:
+                Gripper.enable_suction = true
+                state = 'PICKED'
+        end:
+            pre: state == 'PICKED'
+            eff:
+                exit = true
+                state == 'END'
+
+
+
+

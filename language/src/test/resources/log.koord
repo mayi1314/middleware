@@ -1,0 +1,14 @@
+using Log:
+  sensors:
+    stream stdin
+  actuators:
+    stream stdout
+
+
+
+dosomething:
+  pre:true
+  eff:
+    Log.stdout <<  "hi"
+    Log.stdout <<  "1 + 1 = " << 2
+

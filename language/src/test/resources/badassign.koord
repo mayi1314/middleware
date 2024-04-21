@@ -1,0 +1,25 @@
+using Motion:
+  sensors:
+     int foo
+  actuators:
+     int bar
+
+
+allwrite:
+  int a
+  boolean b
+
+allread:
+  int c
+  int d
+
+local:
+  int e
+  float f
+
+dosomething:
+  pre:true
+  eff:
+    e[12] = f
+    c = f
+    Motion.foo = e

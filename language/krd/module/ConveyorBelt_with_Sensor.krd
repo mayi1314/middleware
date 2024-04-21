@@ -1,0 +1,37 @@
+agent ConveyorBelt_with_Sensor
+  using ConveyorBelt:
+    actuators:
+      float control_power
+    sensors:
+      bool enabled
+      float power
+
+  using Proximity
+    sensors:
+      bool object_detected
+      pos part_loc
+
+  local:
+    pos part_loc_on_belt
+
+  input:
+
+  output:
+    part_loc_on_belt
+
+  start:
+    pre: !ConveyorBelt.enabled && !Proximity.object_detected
+    eff:
+      ConveyorBelt.enabled = true
+      ConveyorBelt.control_power = 10.0
+
+  stop:
+    pre: ConveyorBelt.enabled
+      ConveyorBelt.control_power = 0.0
+      ConveyorBelt.enabled = false
+
+  detected:
+    pre: ConveyorBelt.enabled && Proximity.object_detected
+    eff:
+      ConveyorBelt.control_power = 0.0
+      part_loc_on_belt = Proximity.part_loc

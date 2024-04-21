@@ -1,0 +1,69 @@
+agent Kitting_robot
+  using Arm
+    actuators:
+      pos reach_pos
+    sensors:
+      bool reached
+
+  using Gripper
+    actuators:
+      bool enable_suction
+    sensors:
+      bool enabled
+      bool attached
+
+  local:
+    enum {IDLE, PICK, DROP} state = IDLE
+    Time timer = 0
+    int part_count = 0
+    bool all_loaded = False
+
+  input:
+    pos part_loc_on_belt
+    int nums_part_on_tray
+    int agv_id
+    list part_locs_on_tray
+
+  output:
+    all_loaded
+
+  detected:
+    pre: state == IDLE && part_loc_on_belt != None
+    eff:
+      Arm.reach_pos = part_loc_on_belt
+      state = PICK
+
+  pickup:
+    pre: state == PICK && Arm.reached
+    eff:
+      Gripper.enable_suction = true
+      timer = 0
+
+  transfer:
+    pre: state == PICK && Gripper.enabled && Gripper.attached
+    eff:
+      Arm.reach_pos = part_locs_on_tray[part_count]
+      part_loc_on_belt = None
+      state = DROP
+
+  drop:
+    pre: state == DROP && Arm.reached
+    eff:
+      Gripper.enable_suction = false
+
+  reset:
+    pre: state == DROP && !Gripper.enabled && !Gripper.attached
+    eff:
+      state = IDLE
+      part_count += 1
+      if part_count == nums_part_on_tray:
+        all_loaded = True
+
+  tick:
+    eff: timer++
+
+  pickup_timeout:
+    pre: state == PICK && Gripper.enabled && !Gripper.attached
+         && timer >= TIMEOUT
+    eff:
+      count << "pick timeout"

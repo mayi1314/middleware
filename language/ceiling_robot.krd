@@ -1,0 +1,59 @@
+allread:
+  pos[] mypos
+
+allwrite:
+
+  boolean all_loaded
+  pos[] part_locs_on_tray
+  int nums_part_on_tray
+  pos[] assembly_pos
+  pos current_part_pose
+  pos target_pose
+  pos part
+  boolean agv_reached
+  pos part_to_pick_loc
+
+
+
+using Arm:
+  actuators:
+    pos reach_pos
+    pos assemble
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_count = 0
+
+detected:
+    pre: state == "IDLE" && part_locs_on_tray != None && agv_reached
+    eff:
+        current_part_pose = part_locs_on_tray[part_count]
+        Arm.reach_pos = current_part_pose
+        state = "PICK"
+
+pickup:
+    pre: state == "PICK" && Arm.reached
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+
+transfer:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.assemble = current_part_pose
+        state = "DROPPED"
+
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "END"
+        part_count = part_count + 1

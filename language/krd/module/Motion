@@ -1,0 +1,14 @@
+Agent Motion
+    using Motion:
+      sensors:
+        pos position
+      actuators:
+        pos target
+
+    input:
+      pos target
+
+    move:
+      pre: target != None
+      eff:
+        Motion.target = target
