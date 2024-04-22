@@ -3,5 +3,7 @@
 ## Todo List
 ***
 - [ ] Language: 
-- - [ ] : Translate robot collaboration description language to python
-- [x] 12
+- - [ ] : Translate robot collaboration description language to python.
+- [ ] Middleware: 
+- - [ ] : Connect the exception handling module to the middleware.
+- [x] 
