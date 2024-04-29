@@ -6,4 +6,4 @@
 - - [ ] : Translate robot collaboration description language to python.
 - [ ] Middleware: 
 - - [ ] : Connect the exception handling module to the middleware.
-- [x] 
+- [x] ok

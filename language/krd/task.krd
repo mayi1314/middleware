@@ -1,82 +1,194 @@
-import ConveyorBelt_with_Sensor
-import Kitting_robot
-import AGV_with_tray
-import Gantry
+allread:
+  pos[] mypos: [floor_robot, agv1]
 
-all_read:
-  bool self_pos
+allwrite:
+  boolean exit: [floor_robot, agv1, agv2, ceiling_robot]
+  string process
+  boolean all_loaded
+  pos kit_starting_pose
+  pos kit_ending_pose
+  part part
+  boolean agv_reached
+  pos conv_part_pose
 
 
-all_write:
-  int nums_part_on_tray
-  pos part_loc_on_belt
-   pos start_pos
+@agent(conveyor)
+using ConveyorBelt:
+  actuators:
+    float control_power
+  sensors:
+    boolean enabled
+    float power
 
-const:
-  as_pos = [1, 2, 3, 4]
-  nums_part_on_tray = 4
-  part_locs_on_tray = [1, 2, 3, 4]
-  assembly_pos = [1, 2, 3, 4]
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos part_loc
 
 local:
-  pos start_pos
-  pos target_pos
-  int count = 0
-  enum {IDLE, ALL_LOADED, READY， DROPPED, } state = IDLE
+    string state = "STARTED"
 
-init:
-  c1 = ConveyorBelt_with_Sensor()
-  k1 = Kitting_robot()
-  agv1 = AGV_with_tray()
-  agv2 = AGV_with_tray()
-  gantry = Gantry()
+start:
+    pre: state == "STOPPED" and !Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 100.0
+        state = "STARTED"
+stop:
+    pre: state == "STARTED" and Proximity.object_detected
+    eff:
+        ConveyorBelt.control_power = 0.0
+        state = "STOPPED"
+detect:
+    pre: state == "STOPPED" && Proximity.object_detected
+    eff:
+        conv_part_pose = Proximity.part_loc
 
-  ##  or config to start?
 
-@agent(c1, k1)
-kit_task:
-  pre: state == IDLE && count < nums_part_on_tray
-  eff:
-    start_pos = c1.run()
-    target_pos = part_locs_on_tray[count]
-    count += 1
-    k1.run(start_pos, target_pos)
-    if count == nums_part_on_tray:
-        state = ALL_LOADED
+@agent(floor_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+  sensors:
+    boolean reached
 
-##
-##Split the task into two finer parts
-##
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
 
-@agent(c1)
-belt_task:
-  pre: state == IDLE && count < nums_part_on_tray
-  eff:
-    start_pos = c1.run()
+local:
+    string state = "IDLE"
+    int part_nums = 0
+    int count = 0
 
-@agent(k1)
-kit_task:
-  pre: start_pos != None
-  eff:
-    target_pos = part_locs_on_tray[count]
-    count += 1
-    k1.run(start_pos, target_pos)
-    start_pos = None
-    if count == nums_part_on_tray:
-       state = ALL_LOADED
+move:
+    pre: state == "START" && kit_starting_pose != None
+    eff:
+        Arm.reach_pos = kit_starting_pose
+        state = "PICK"
+pick:
+    pre: state == "PICK"
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+transfer:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.reach_pos = kit_ending_pose
+        state = "DROP"
+drop:
+    pre: state == "DROP" && Gripper.attached
+    eff:
+        Gripper.enable_suction = false
+        state = "DROPPED"
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "IDLE"
+        count = count + 1
+        if part_nums == count:
+            all_loaded = true
+
 
 @agent(agv1)
-move_to_as:
-  pre: ALL_LOADED
-  eff:
-    avg1.run(as_pos[0])
-    state = READY
+using AGV:
+  actuators:
+    int to_station
+  sensors:
+    pos station
+    boolean reached
+using Proximity:
+  sensors:
+    boolean object_detected
+    pos[] part_loc
 
-@agent(gantry)
-assembly_task:
-  pre: READY
-  eff:
-    gantry.run(part_locs_on_tray[nums_part_on_tray - count], assembly_pos[nums_part_on_tray - count])
-    count -= 1
-    if count == 0:
-        state = DROPPED
+local:
+    string state = "IDLE"
+    int destination = 1
+
+move:
+    pre: all_loaded && state == "START"
+    eff:
+        AGV.to_station = destination
+        state = "STOP"
+	    part_locs_on_tray = Proximity.part_loc
+
+
+@agent(ceiling_robot)
+using Arm:
+  actuators:
+    pos reach_pos
+    pos assemble
+  sensors:
+    boolean reached
+
+using Gripper:
+  actuators:
+    boolean enable_suction
+  sensors:
+    boolean enabled
+    boolean attached
+
+local:
+    string state = "IDLE"
+    int part_count = 0
+
+move:
+    pre: state == "START" && part_locs_on_tray != None
+    eff:
+        ceiling_starting_pose = part_locs_on_tray[0]
+        Arm.reach_pos = current_part_pose
+        state = "PICK"
+pick:
+    pre: state == "PICK"
+    eff:
+        Gripper.enable_suction = true
+        state = "PICKED"
+assemble:
+    pre: state == "PICKED" && Gripper.attached
+    eff:
+        Arm.assemble = ceiling_ending_pose
+        state = "DROP"
+drop:
+    pre: state == "DROP" && Gripper.attached
+    eff:
+        Gripper.enable_suction = false
+        state = "DROPPED"
+reset:
+    pre: state == "DROPPED"
+    eff:
+        state = "IDLE"
+
+
+
+monitor:
+    check_duration('floor_robot', 'transfer', 'Gripper.attached', 'true' )
+    exception:
+        local: string state = 'IDLE'
+        init:
+            exit = false
+        exit:
+            pre: exit
+            eff: true
+        pick:
+            pre: state == 'START'
+            eff:
+                kit_starting_pose = check_part_on_bin(part)
+                if kit_starting_pose != None:
+                    Arm.reach_pos = kit_starting_pose
+                    state = 'PICK'
+                else:
+                    exit = true
+        suck:
+            pre: state == 'PICK'
+            eff:
+                Gripper.enable_suction = true
+                state = 'PICKED'
+        end:
+            pre: state == 'PICKED'
+            eff:
+                state == 'END'
+                exit = true
+
